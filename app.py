@@ -11,7 +11,9 @@ import plotly.graph_objects as go
 from pathlib import Path
 
 from data_loader import load_modules
-from metrics import calculate_metrics, get_category_stats, get_top_modules, get_opportunities, get_global_kpis
+from metrics import (calculate_metrics, get_category_stats, get_top_modules, 
+                     get_opportunities, get_global_kpis, get_advanced_stats, 
+                     get_trimmed_comparison, get_category_advanced_stats, trimmed_mean)
 
 # Configuration de la page
 st.set_page_config(
@@ -142,12 +144,202 @@ with col2:
 with col3:
     st.metric("Éditeurs", kpis['nb_publishers'])
 with col4:
-    st.metric("Modules filtrés", f"{len(filtered_df):,}")
+    st.metric("CA/mois total", format_currency(kpis['ca_mois_total']))
 
 st.divider()
 
 # ============================================================================
-# SECTION 2: ANALYSE PAR CATÉGORIE
+# SECTION 2: STATISTIQUES AVANCÉES (Médianes, Trimmed Mean)
+# ============================================================================
+st.header("📈 Statistiques Avancées")
+
+st.markdown("""
+*Analyse robuste avec médianes et moyennes tronquées pour éviter le biais des gros modules.*
+""")
+
+# Slider pour le trim
+trim_pct = st.slider(
+    "Exclure les extrêmes (% de chaque côté)", 
+    min_value=0, max_value=25, value=10, step=5,
+    help="Exclut les X% modules les plus vendus et les X% les moins vendus pour avoir une moyenne plus représentative"
+)
+
+# Calculer les stats avancées
+advanced_stats = get_advanced_stats(filtered_df, trim_pct)
+
+tab_stats1, tab_stats2, tab_stats3, tab_stats4 = st.tabs([
+    "📊 Comparaison Moyenne vs Médiane", 
+    "📉 Distribution Percentiles",
+    "🔄 Impact du Trimming",
+    "📁 Stats par Catégorie"
+])
+
+with tab_stats1:
+    st.subheader("Moyenne vs Médiane vs Trimmed Mean")
+    st.markdown(f"*Trim actuel: {trim_pct}% de chaque côté exclus*")
+    
+    # Tableau comparatif
+    if advanced_stats:
+        comparison_data = []
+        for col, stats in advanced_stats.items():
+            if col in ['ca_estime', 'ca_par_mois', 'price', 'downloads', 'downloads_par_mois']:
+                comparison_data.append({
+                    'Métrique': stats['label'],
+                    'Moyenne': f"{stats['moyenne']:,.0f}",
+                    'Médiane': f"{stats['mediane']:,.0f}",
+                    f'Trim {trim_pct}%': f"{stats['trimmed']:,.0f}",
+                    'Écart moy/méd': f"{stats['ecart_pct']:+.0f}%"
+                })
+        
+        st.dataframe(pd.DataFrame(comparison_data), use_container_width=True, hide_index=True)
+        
+        # Graphique barres
+        fig_compare = go.Figure()
+        metrics_to_plot = ['ca_estime', 'ca_par_mois']
+        for metric in metrics_to_plot:
+            if metric in advanced_stats:
+                s = advanced_stats[metric]
+                fig_compare.add_trace(go.Bar(
+                    name=s['label'],
+                    x=['Moyenne', 'Médiane', f'Trim {trim_pct}%'],
+                    y=[s['moyenne'], s['mediane'], s['trimmed']],
+                    text=[f"{v:,.0f}€" for v in [s['moyenne'], s['mediane'], s['trimmed']]],
+                    textposition='auto'
+                ))
+        
+        fig_compare.update_layout(
+            title="Comparaison des méthodes de calcul",
+            barmode='group',
+            height=400
+        )
+        st.plotly_chart(fig_compare, use_container_width=True)
+        
+        st.info(f"""
+        **💡 Interprétation:**
+        - **Écart élevé** (>100%) = distribution très asymétrique, quelques gros modules tirent la moyenne
+        - **Médiane** = valeur d'un module "typique" (50% font moins, 50% font plus)
+        - **Trim {trim_pct}%** = moyenne sans les extrêmes, bon compromis
+        """)
+
+with tab_stats2:
+    st.subheader("Distribution par Percentiles")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if 'ca_estime' in advanced_stats:
+            s = advanced_stats['ca_estime']
+            percentile_data = {
+                'Percentile': ['P10', 'P25', 'P50 (Médiane)', 'P75', 'P90', 'P95', 'P99'],
+                'CA Estimé (€)': [f"{s['p10']:,.0f}", f"{s['p25']:,.0f}", f"{s['p50']:,.0f}", 
+                                 f"{s['p75']:,.0f}", f"{s['p90']:,.0f}", f"{s['p95']:,.0f}", f"{s['p99']:,.0f}"]
+            }
+            st.markdown("**CA Estimé**")
+            st.dataframe(pd.DataFrame(percentile_data), use_container_width=True, hide_index=True)
+    
+    with col2:
+        if 'ca_par_mois' in advanced_stats:
+            s = advanced_stats['ca_par_mois']
+            percentile_data = {
+                'Percentile': ['P10', 'P25', 'P50 (Médiane)', 'P75', 'P90', 'P95', 'P99'],
+                'CA/mois (€)': [f"{s['p10']:,.0f}", f"{s['p25']:,.0f}", f"{s['p50']:,.0f}", 
+                               f"{s['p75']:,.0f}", f"{s['p90']:,.0f}", f"{s['p95']:,.0f}", f"{s['p99']:,.0f}"]
+            }
+            st.markdown("**CA par Mois**")
+            st.dataframe(pd.DataFrame(percentile_data), use_container_width=True, hide_index=True)
+    
+    # Box plot
+    paid_filtered = filtered_df[filtered_df['price'] > 0]
+    if len(paid_filtered) > 0:
+        fig_box = px.box(
+            paid_filtered,
+            y='ca_par_mois',
+            title="Distribution CA/mois (Box Plot)",
+            labels={'ca_par_mois': 'CA/mois (€)'}
+        )
+        fig_box.update_layout(height=400)
+        st.plotly_chart(fig_box, use_container_width=True)
+
+with tab_stats3:
+    st.subheader("Impact du niveau de Trimming")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("**CA Estimé**")
+        trim_ca = get_trimmed_comparison(filtered_df, 'ca_estime')
+        if len(trim_ca) > 0:
+            trim_ca['Moyenne'] = trim_ca['Moyenne'].apply(lambda x: f"{x:,.0f}€")
+            st.dataframe(trim_ca, use_container_width=True, hide_index=True)
+    
+    with col2:
+        st.markdown("**CA/mois**")
+        trim_ca_mois = get_trimmed_comparison(filtered_df, 'ca_par_mois')
+        if len(trim_ca_mois) > 0:
+            trim_ca_mois['Moyenne'] = trim_ca_mois['Moyenne'].apply(lambda x: f"{x:,.0f}€")
+            st.dataframe(trim_ca_mois, use_container_width=True, hide_index=True)
+    
+    # Graphique évolution trim
+    paid_filtered = filtered_df[filtered_df['price'] > 0]
+    if len(paid_filtered) > 0:
+        trim_values = []
+        for t in range(0, 26, 5):
+            trim_values.append({
+                'Trim (%)': t,
+                'CA moyen': trimmed_mean(paid_filtered['ca_estime'], t),
+                'CA/mois moyen': trimmed_mean(paid_filtered['ca_par_mois'], t)
+            })
+        
+        trim_df = pd.DataFrame(trim_values)
+        
+        fig_trim = px.line(
+            trim_df, x='Trim (%)', y=['CA moyen', 'CA/mois moyen'],
+            title="Évolution des moyennes selon le niveau de trimming",
+            labels={'value': 'Valeur (€)', 'variable': 'Métrique'}
+        )
+        fig_trim.update_layout(height=400)
+        st.plotly_chart(fig_trim, use_container_width=True)
+
+with tab_stats4:
+    st.subheader("Catégories par CA/mois Médian")
+    st.markdown("*Classement plus fiable que la moyenne, moins biaisé par les outliers*")
+    
+    cat_advanced = get_category_advanced_stats(filtered_df)
+    if len(cat_advanced) > 0:
+        display_cat = cat_advanced[['category', 'nb_modules', 'ca_mois_median', 'ca_mois_moyen', 
+                                    'ca_median', 'ca_moyen', 'prix_median', 'note_moy']].copy()
+        display_cat.columns = ['Catégorie', 'Modules', 'CA/mois Médian', 'CA/mois Moyen',
+                              'CA Médian', 'CA Moyen', 'Prix Médian', 'Note']
+        
+        st.dataframe(display_cat.head(25), use_container_width=True, hide_index=True)
+        
+        # Bar chart médiane vs moyenne
+        fig_cat = go.Figure()
+        top_cats = cat_advanced.head(15)
+        fig_cat.add_trace(go.Bar(
+            name='CA/mois Médian',
+            x=top_cats['category'],
+            y=top_cats['ca_mois_median'],
+            marker_color='#667eea'
+        ))
+        fig_cat.add_trace(go.Bar(
+            name='CA/mois Moyen',
+            x=top_cats['category'],
+            y=top_cats['ca_mois_moyen'],
+            marker_color='#764ba2'
+        ))
+        fig_cat.update_layout(
+            title="Top 15 Catégories: CA/mois Médian vs Moyen",
+            barmode='group',
+            height=500,
+            xaxis_tickangle=-45
+        )
+        st.plotly_chart(fig_cat, use_container_width=True)
+
+st.divider()
+
+# ============================================================================
+# SECTION 3: ANALYSE PAR CATÉGORIE
 # ============================================================================
 st.header("📁 Analyse par catégorie")
 
@@ -206,7 +398,7 @@ with tab3:
 st.divider()
 
 # ============================================================================
-# SECTION 3: TOP MODULES & OPPORTUNITÉS
+# SECTION 4: TOP MODULES & OPPORTUNITÉS
 # ============================================================================
 st.header("🏆 Top Modules & Opportunités")
 
@@ -258,7 +450,7 @@ with tab_top4:
 st.divider()
 
 # ============================================================================
-# SECTION 4: EXPLORATION DES DONNÉES
+# SECTION 5: EXPLORATION DES DONNÉES
 # ============================================================================
 st.header("🔬 Explorer les données")
 

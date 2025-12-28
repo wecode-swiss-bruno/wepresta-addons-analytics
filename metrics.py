@@ -129,6 +129,7 @@ def get_global_kpis(df: pd.DataFrame) -> dict:
         'modules_gratuits': len(df[df['is_free']]),
         'modules_payants': len(paid_df),
         'ca_total': df['ca_estime'].sum(),
+        'ca_mois_total': paid_df['ca_par_mois'].sum() if len(paid_df) > 0 else 0,
         'prix_moyen_payants': paid_df['price'].mean() if len(paid_df) > 0 else 0,
         'prix_median_payants': paid_df['price'].median() if len(paid_df) > 0 else 0,
         'downloads_total': df['downloads'].sum(),
@@ -137,6 +138,113 @@ def get_global_kpis(df: pd.DataFrame) -> dict:
         'nb_categories': df['category'].nunique(),
         'nb_publishers': df['publisher'].nunique(),
     }
+
+
+def trimmed_mean(series: pd.Series, trim_pct: float) -> float:
+    """
+    Calcule la moyenne tronquée en excluant les X% extrêmes de chaque côté.
+    trim_pct: pourcentage à exclure de chaque côté (ex: 10 = exclure 10% bas et 10% haut)
+    """
+    if len(series) == 0:
+        return 0
+    n = len(series)
+    k = int(n * trim_pct / 100)
+    if k == 0:
+        return series.mean()
+    sorted_vals = series.sort_values().values
+    trimmed = sorted_vals[k:-k] if k > 0 else sorted_vals
+    return np.mean(trimmed) if len(trimmed) > 0 else series.mean()
+
+
+def get_advanced_stats(df: pd.DataFrame, trim_pct: float = 10) -> dict:
+    """
+    Calcule les statistiques avancées: moyenne, médiane, trimmed mean, percentiles.
+    """
+    paid_df = df[df['price'] > 0].copy()
+    
+    if len(paid_df) == 0:
+        return {}
+    
+    stats = {}
+    metrics = {
+        'ca_estime': 'CA Estimé',
+        'ca_par_mois': 'CA/mois',
+        'price': 'Prix',
+        'downloads': 'Downloads',
+        'downloads_par_mois': 'Downloads/mois',
+        'rating': 'Note',
+        'reviews_count': 'Avis'
+    }
+    
+    for col, label in metrics.items():
+        data = paid_df[col].dropna()
+        if len(data) == 0:
+            continue
+        stats[col] = {
+            'label': label,
+            'moyenne': data.mean(),
+            'mediane': data.median(),
+            'trimmed': trimmed_mean(data, trim_pct),
+            'ecart_pct': ((data.mean() - data.median()) / data.median() * 100) if data.median() != 0 else 0,
+            'p10': data.quantile(0.10),
+            'p25': data.quantile(0.25),
+            'p50': data.quantile(0.50),
+            'p75': data.quantile(0.75),
+            'p90': data.quantile(0.90),
+            'p95': data.quantile(0.95),
+            'p99': data.quantile(0.99),
+            'min': data.min(),
+            'max': data.max(),
+            'std': data.std(),
+        }
+    
+    return stats
+
+
+def get_trimmed_comparison(df: pd.DataFrame, metric: str = 'ca_estime') -> pd.DataFrame:
+    """
+    Compare les moyennes avec différents niveaux de trimming.
+    """
+    paid_df = df[df['price'] > 0]
+    if len(paid_df) == 0:
+        return pd.DataFrame()
+    
+    data = paid_df[metric].dropna()
+    results = []
+    
+    for trim in [0, 5, 10, 15, 20, 25]:
+        results.append({
+            'Trim %': f"{trim}%",
+            'Moyenne': trimmed_mean(data, trim),
+            'N modules': len(data) - 2 * int(len(data) * trim / 100) if trim > 0 else len(data)
+        })
+    
+    return pd.DataFrame(results)
+
+
+def get_category_advanced_stats(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Calcule les stats avancées par catégorie avec médianes.
+    """
+    paid_df = df[df['price'] > 0]
+    
+    stats = paid_df.groupby('category').agg({
+        'module_id': 'count',
+        'ca_estime': ['sum', 'mean', 'median'],
+        'ca_par_mois': ['sum', 'mean', 'median'],
+        'price': ['mean', 'median'],
+        'rating': 'mean'
+    }).round(2)
+    
+    stats.columns = ['nb_modules', 'ca_total', 'ca_moyen', 'ca_median', 
+                     'ca_mois_total', 'ca_mois_moyen', 'ca_mois_median', 
+                     'prix_moyen', 'prix_median', 'note_moy']
+    
+    # Filtrer catégories avec au moins 3 modules
+    stats = stats[stats['nb_modules'] >= 3]
+    stats = stats.sort_values('ca_mois_median', ascending=False)
+    
+    return stats.reset_index()
 
 
 if __name__ == "__main__":
