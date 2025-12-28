@@ -21,9 +21,6 @@
 
 Depuis le RGPD (2018) et les évolutions légales constantes, **chaque e-commerce européen doit être en conformité**. Les amendes peuvent atteindre 4% du CA annuel. Nos modules vous protègent et rassurent vos clients.
 
-> **Marché** : 10M€ de CA sur PrestaShop Addons  
-> **Demande** : Constante, obligation légale
-
 ---
 
 ### RGPD Cookie Consent Pro
@@ -89,9 +86,6 @@ Plus besoin d'avocat pour vos mentions légales, CGV et politique de confidentia
 ### 🎯 Pourquoi c'est essentiel
 
 **70% des paniers sont abandonnés**. Chaque visiteur qui part sans acheter est une opportunité perdue. Nos outils marketing transforment les visiteurs en clients et les clients en ambassadeurs.
-
-> **Marché** : 25M€+ de CA combiné  
-> **ROI** : +15 à +40% de conversions constatées
 
 ---
 
@@ -249,9 +243,6 @@ Collectez et affichez les avis clients pour booster la confiance et le SEO. Int�
 
 **93% du trafic web commence par une recherche Google**. Sans SEO, votre boutique est invisible. Nos outils optimisent automatiquement votre référencement pour attirer du trafic qualifié gratuit.
 
-> **Marché** : 15M€ de CA sur PrestaShop Addons  
-> **Impact** : x2 à x10 sur le trafic organique
-
 ---
 
 ### SEO Manager 360
@@ -320,9 +311,6 @@ Ajoutez les données structurées Schema.org pour afficher prix, avis, stock dir
 ### 🎯 Pourquoi c'est essentiel
 
 Gérer un e-commerce prend du temps. **Chaque heure économisée est une heure pour développer votre business**. Nos outils automatisent les tâches répétitives et simplifient la gestion quotidienne.
-
-> **Marché** : 30M€+ de CA combiné  
-> **Gain** : 5-20h/semaine économisées
 
 ---
 
@@ -601,9 +589,6 @@ Import/export avancé pour produits, clients, commandes. Mappings personnalisés
 
 Acquérir un nouveau client coûte **5x plus cher** que fidéliser un existant. Augmentez le panier moyen et la récurrence d'achat avec nos outils de vente intelligents.
 
-> **Marché** : 20M€+ de CA combiné  
-> **Impact** : +20-50% de panier moyen
-
 ---
 
 ### Cross-Sell & Upsell Pro
@@ -731,9 +716,6 @@ Prix dégressifs automatiques. Idéal pour le B2B et les grosses quantités.
 ### 🎯 Pourquoi c'est essentiel
 
 **Multipliez vos canaux de vente**. Google Shopping, Amazon, Facebook... Chaque marketplace est une nouvelle source de clients. Synchronisez votre catalogue et vendez partout.
-
-> **Marché** : 42M€ de CA combiné (top 1 & 2!)  
-> **Impact** : x2 à x5 sur les ventes
 
 ---
 
