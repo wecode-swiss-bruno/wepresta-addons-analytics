@@ -79,3 +79,6 @@ if __name__ == "__main__":
     print(f"\nExemple de module:")
     print(df.iloc[0][['name', 'price', 'downloads', 'publication_datetime', 'category']])
 
+
+
+
